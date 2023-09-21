@@ -2,9 +2,9 @@
 
 either use the provided bash scripts or use bam
 
-`build_debug`
+`./build_debug && bin/a.out.debug`
 
-`build_release`
+`./build_release && bin/a.out.release`
 
 `bam debug`
 
