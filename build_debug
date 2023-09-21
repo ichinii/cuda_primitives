@@ -1,3 +1,5 @@
 #!/bin/bash
 
-nvcc $@ --debug -o a.out.debug *.cu *.cpp
+SRC=$(find . -print | grep -e ".cpp$" -e ".cu$")
+echo "Compiling: "$SRC
+nvcc $@ --debug -o a.out.debug $SRC
