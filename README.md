@@ -6,6 +6,10 @@ either use the provided bash scripts or use bam
 
 `./build_release && bin/a.out.release`
 
+`./build_release && nvprof bin/a.out.release`
+
 `bam debug`
 
 `bam release`
+
+`bam prof`

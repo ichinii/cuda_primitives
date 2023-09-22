@@ -24,7 +24,7 @@ AddTool(function(s)
         local output = input:gsub("^"..src_dir.."/", "")
         output = PathJoin(objdir(s), PathBase(input))..".o"
 
-        local flags = table.concat(TableFlatten({s.cu.flags_compile, s.cu.flags}), "")
+        local flags = table.concat(TableFlatten({s.cu.flags_compile, s.cu.flags}), " ")
         AddJob(
             output,
             "nvcc "..input,
@@ -44,7 +44,7 @@ AddTool(function(s)
 end)
 
 function link(s, output, inputs)
-    local flags = table.concat(TableFlatten({s.cu.flags_link, s.cu.flags}), "")
+    local flags = table.concat(TableFlatten({s.cu.flags_link, s.cu.flags}), " ")
     local input = table.concat(inputs, " ")
     AddJob(
         output,
@@ -72,24 +72,36 @@ function register(s)
     local run = "r_"..s.name
     AddJob(
         run,
-        "Running '"..bin.."'...",
+        "Running '"..bin.."'",
         "./"..bin
     )
     AddDependency(run, compile)
 
     PseudoTarget(s.name, run)
+    return bin
 end
 
+-- target debug
 s_debug = NewSettings()
 s_debug.name = "debug"
 s_debug.cc.flags:Add("-g")
 table.insert(s_debug.cu.flags, "--debug")
+table.insert(s_debug.cu.flags, "--device-debug")
 register(s_debug)
 
+-- target release
 s_release = NewSettings()
 s_release.name = "release"
 s_release.cc.flags:Add("-O3")
 table.insert(s_release.cu.flags, "--optimize 3")
-register(s_release)
+bin_release = register(s_release)
+
+-- target prof
+AddJob(
+    "prof",
+    "Profiling '"..bin_release.."'",
+    "nvprof "..bin_release
+)
+AddDependency("prof", bin_release)
 
 DefaultTarget("debug")

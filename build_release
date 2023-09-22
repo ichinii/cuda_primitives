@@ -2,4 +2,5 @@
 
 SRC=$(find . -print | grep -e ".cpp$" -e ".cu$")
 echo "Compiling: "$SRC
-nvcc $@ --optimize 3 -o a.out.release $SRC
+mkdir -p bin
+nvcc $@ --optimize 3 -o bin/a.out.release $SRC

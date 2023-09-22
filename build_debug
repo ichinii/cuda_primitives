@@ -2,4 +2,5 @@
 
 SRC=$(find . -print | grep -e ".cpp$" -e ".cu$")
 echo "Compiling: "$SRC
-nvcc $@ --debug -o a.out.debug $SRC
+mkdir -p bin
+nvcc $@ --debug --device-debug -o bin/a.out.debug $SRC
