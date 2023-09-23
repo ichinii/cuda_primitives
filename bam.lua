@@ -31,6 +31,7 @@ AddTool(function(s)
             "nvcc "..flags.." -c -o "..output.." "..input
         )
         AddDependency(output, input)
+        --TODO: resolve include dependencies
 
         return output
     end
