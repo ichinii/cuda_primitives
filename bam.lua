@@ -1,6 +1,34 @@
 src_dir = "src"
 obj_dir = "obj"
+dep_dir = "dep"
 bin_dir = "bin"
+
+function read_dep(filename)
+    local file = io.open(filename)
+    if not file then
+        return
+    else
+        local includes = {}
+        local first_line_skipped = false
+
+        for line in file:lines() do
+            if first_line_skipped then
+                line = line:gsub("[ ]", "")
+                line = line:gsub("\\", "")
+                local is_include = "src" == string.sub(line, 1, string.len(src_dir))
+                if is_include then
+                    table.insert(includes, line)
+                end
+            end
+
+            first_line_skipped = true
+        end
+
+        file:close()
+
+        return includes
+    end
+end
 
 AddTool(function(s)
     s.cc.flags:Add("-Wall")
@@ -14,6 +42,7 @@ AddTool(function(s)
     s.name = "default"
 
     local function objdir(s) return PathJoin(obj_dir, s.name) end
+    local function depdir(s) return PathJoin(dep_dir, s.name) end
 
     s.cc.Output = function(s, input)
         input = input:gsub("^"..src_dir.."/", "")
@@ -22,7 +51,8 @@ AddTool(function(s)
 
     s.compile.mappings.cu = function(s, input)
         local output = input:gsub("^"..src_dir.."/", "")
-        output = PathJoin(objdir(s), PathBase(input))..".o"
+        local dep = PathJoin(depdir(s), PathBase(output))..".dep"
+        output = PathJoin(objdir(s), PathBase(output))..".o"
 
         local flags = table.concat(TableFlatten({s.cu.flags_compile, s.cu.flags}), " ")
         AddJob(
@@ -31,7 +61,19 @@ AddTool(function(s)
             "nvcc "..flags.." -c -o "..output.." "..input
         )
         AddDependency(output, input)
-        --TODO: resolve include dependencies
+
+        AddJob(
+            dep,
+            "nvcc -MM "..input,
+            "nvcc "..flags.." -MM "..input.." > "..dep
+        )
+        AddDependency(dep, input)
+        AddDependency(output, dep)
+        local includes = read_dep(dep)
+        if includes then
+            AddDependency(output, includes)
+            AddDependency(dep, includes)
+        end
 
         return output
     end
