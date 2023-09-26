@@ -6,9 +6,9 @@
 
 int main()
 {
-    constexpr const std::size_t N = 512*512*512;
-    constexpr const std::size_t T = 512;
-    // constexpr const std::size_t B = T*T;
+    constexpr const std::size_t N = 1<<22;
+    constexpr const std::size_t T = 128;
+    // constexpr const std::size_t B = N/T;
     constexpr const std::size_t S = N * sizeof(int);
 
     std::cout << std::boolalpha
@@ -30,25 +30,32 @@ int main()
     cudaEventCreate(&stop_event);
 
     auto test = [&] (const char *name, auto test_fn) {
+        using namespace std::chrono;
+
         cudaMemcpy(data_src, init_data.data(), S, cudaMemcpyHostToDevice);
 
+        auto start_time = steady_clock::now();
         cudaEventRecord(start_event);
         test_fn();
         cudaEventRecord(stop_event);
         cudaEventSynchronize(stop_event);
+        auto stop_time = steady_clock::now();
 
         float elapsed_time;
         cudaEventElapsedTime(&elapsed_time, start_event, stop_event);
+
+        auto elapsed_time2 = duration_cast<microseconds>(stop_time - start_time).count() / 1000.0f;
 
         int result;
         cudaMemcpy(&result, data_dst, sizeof(int), cudaMemcpyDeviceToHost);
 
         std::cout
-            // << "running test: '" << name << "'" << std::endl
+            << "running test: '" << name << "'" << std::endl
             // << "expected: " << N << std::endl
             // << "got:      " << result << std::endl
             << "ok:       " << (N == result) << std::endl
             << "duration: " << elapsed_time << std::endl
+            << "duration: " << elapsed_time2 << std::endl
             << std::endl;
     };
 
@@ -138,38 +145,16 @@ int main()
     //     sum_3<<<1, t/2, t*sizeof(int)>>>(data_dst, data_src);
     // };
 
-    auto do_sum_6 = [] (int *&data_dst, int *&data_src, int b, int t, int n) {
-        t = std::min(t, n);
-        b = std::min(b, n/t);
-        b = floor_power_of_2(b);
-        std::cout << b << std::endl;
-        while (n > 1) {
-            sum_6(data_dst, data_src, b, t, n);
-            std::swap(data_dst, data_src);
-            n = b;
-            t = std::min(t, n);
-            b /= t;
-        }
-        std::swap(data_dst, data_src);
+    auto test_fn_6 = [&] (std::size_t maxBlocks) {
+        do_sum_6(data_dst, data_src, maxBlocks, T, N);
     };
 
-    auto test_fn_6 = [&] (std::size_t maxBlocks) {
-        // int n = N;
-        // auto b = std::min(B, maxBlocks);
-        // while (n > 1) {
-        //     int t = std::min((int)T, n);
-        //     std::cout << "\t"
-        //         << " " << b
-        //         << " " << t
-        //         << " " << n
-        //         << std::endl;
-        //     sum_6(data_dst, data_src, b, t, n);
-        //     std::swap(data_dst, data_src);
-        //     n = b;
-        //     b /= std::min(t, n);
-        // }
-        // std::swap(data_dst, data_src);
-        do_sum_6(data_dst, data_src, maxBlocks, T, N);
+    auto test_fn_7 = [&] (std::size_t maxBlocks) {
+        do_sum_7(data_dst, data_src, maxBlocks, T, N);
+    };
+
+    auto test_reduce6 = [&] (std::size_t maxBlocks) {
+        do_reduce6(data_dst, data_src, maxBlocks, T, N);
     };
 
     test_cpu_0();
@@ -181,14 +166,15 @@ int main()
     // test("sum_4", test_fn_4);
     // test("sum_5", test_fn_5);
 
-    for (int i = 0; i < 20; ++i) {
+    // for (int i = 0; i < 20; ++i) {
+        int i = 12;
         int maxBlocks = 1<<i;
-        // if (maxBlocks <= B) {
-            std::cout << "thread ratio: " << (T*maxBlocks / 2816.0f) << std::endl;
-            std::cout << "max blocks: " << maxBlocks << std::endl;
-            test("sum_6", [=] { test_fn_6(maxBlocks); });
-        // }
-    }
+        std::cout << "\tthread ratio: " << (T*maxBlocks / 2816.0f) << std::endl;
+        std::cout << "\tmax blocks: " << maxBlocks << std::endl << std::endl;
+        // test("sum_6", [=] { test_fn_6(maxBlocks); });
+        test("reduce6", [=] { test_reduce6(maxBlocks); });
+        test("sum_7", [=] { test_fn_7(maxBlocks); });
+    // }
 
     cudaFree(data_src);
     cudaFree(data_dst);
